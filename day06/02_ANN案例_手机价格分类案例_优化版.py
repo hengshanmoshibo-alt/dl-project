@@ -10,6 +10,7 @@ import numpy as np
 import time
 from sklearn.preprocessing import StandardScaler
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # 构建数据集
 def create_dataset():
@@ -64,12 +65,13 @@ class PhonePriceModel(nn.Module):
 
 # 编写训练函数
 def train(train_dataset, input_dim, class_num):
+	print(DEVICE)
 	# 固定随机数种子
 	torch.manual_seed(0)
 	# 初始化数据加载器
-	dataloader = DataLoader(train_dataset, shuffle=True, batch_size=8)
+	dataloader = DataLoader(train_dataset, shuffle=True, batch_size=8, pin_memory=True)
 	# 初始化模型
-	model = PhonePriceModel(input_dim, class_num)
+	model = PhonePriceModel(input_dim, class_num).to(DEVICE)
 	# 损失函数 CrossEntropyLoss = softmax + 损失计算
 	criterion = nn.CrossEntropyLoss()
 	# 优化③:使用Adam优化方法, 优化④:学习率变为1e-4
@@ -85,6 +87,8 @@ def train(train_dataset, input_dim, class_num):
 		# 遍历每个batch数据进行处理
 		for x, y in dataloader:
 			model.train()
+			x = x.to(DEVICE)
+			y = y.to(DEVICE)
 			output = model(x)
 			# 计算损失
 			loss = criterion(output, y)
@@ -106,10 +110,10 @@ def train(train_dataset, input_dim, class_num):
 
 def evaluate(valid_dataset, input_dim, class_num):
 	# 加载模型和训练好的网络参数
-	model = PhonePriceModel(input_dim, class_num)
+	model = PhonePriceModel(input_dim, class_num).to(DEVICE)
 	# load_state_dict:将加载的参数字典应用到模型上
 	# load:加载用来保存模型参数的文件
-	model.load_state_dict(torch.load('./model/phone-price-model2.pth'))
+	model.load_state_dict(torch.load('./model/phone-price-model2.pth', map_location=DEVICE))
 	# 构建加载器
 	dataloader = DataLoader(valid_dataset, batch_size=8, shuffle=False)
 	# 评估测试集
@@ -118,6 +122,8 @@ def evaluate(valid_dataset, input_dim, class_num):
 	for x, y in dataloader:
 		# 将其送入网络中
 		# model.eval()
+		x = x.to(DEVICE)
+		y = y.to(DEVICE)
 		output = model(x)
 		# 获取预测类别结果
 		y_pred = torch.argmax(output, dim=1)
