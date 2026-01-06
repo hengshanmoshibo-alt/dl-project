@@ -9,6 +9,7 @@ import torch.optim as optim
 import numpy as np
 import time
 from sklearn.preprocessing import StandardScaler
+import os
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -69,7 +70,7 @@ def train(train_dataset, input_dim, class_num):
 	# 固定随机数种子
 	torch.manual_seed(0)
 	# 初始化数据加载器
-	dataloader = DataLoader(train_dataset, shuffle=True, batch_size=8, pin_memory=True)
+	dataloader = DataLoader(train_dataset, shuffle=True, batch_size=8, pin_memory=(DEVICE.type == "cuda"))
 	# 初始化模型
 	model = PhonePriceModel(input_dim, class_num).to(DEVICE)
 	# 损失函数 CrossEntropyLoss = softmax + 损失计算
@@ -105,6 +106,7 @@ def train(train_dataset, input_dim, class_num):
 		print('epoch: %4s loss: %.2f, time: %.2fs' %
 			  (epoch_idx + 1, total_loss / total_num, time.time() - start))
 	# 模型保存
+	os.makedirs('./model', exist_ok=True)
 	torch.save(model.state_dict(), './model/phone-price-model2.pth')
 
 
@@ -114,21 +116,22 @@ def evaluate(valid_dataset, input_dim, class_num):
 	# load_state_dict:将加载的参数字典应用到模型上
 	# load:加载用来保存模型参数的文件
 	model.load_state_dict(torch.load('./model/phone-price-model2.pth', map_location=DEVICE))
+	model.eval()
 	# 构建加载器
 	dataloader = DataLoader(valid_dataset, batch_size=8, shuffle=False)
 	# 评估测试集
 	correct = 0
 	# 遍历测试集中的数据
-	for x, y in dataloader:
-		# 将其送入网络中
-		# model.eval()
-		x = x.to(DEVICE)
-		y = y.to(DEVICE)
-		output = model(x)
-		# 获取预测类别结果
-		y_pred = torch.argmax(output, dim=1)
-		# 获取预测正确的个数
-		correct += (y_pred == y).sum()
+	with torch.no_grad():
+		for x, y in dataloader:
+			# 将其送入网络中
+			x = x.to(DEVICE)
+			y = y.to(DEVICE)
+			output = model(x)
+			# 获取预测类别结果
+			y_pred = torch.argmax(output, dim=1)
+			# 获取预测正确的个数
+			correct += (y_pred == y).sum().item()
 	# 求预测精度
 	print('Acc: %.5f' % (correct / len(valid_dataset)))
 
