@@ -35,11 +35,12 @@ from torchvision.transforms import ToTensor  # pip install torchvision -i https:
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import time
-import matplotlib.pyplot as plt
 from torchsummary import summary
 
 # 每批次样本数
-BATCH_SIZE = 8
+BATCH_SIZE = 256
+# prefer GPU if available
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 # 1. 准备数据集.
@@ -111,7 +112,7 @@ def train(train_dataset):
     # 1. 创建数据加载器.
     dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     # 2. 创建模型对象.
-    model = ImageModel()
+    model = ImageModel().to(DEVICE)
     # 3. 创建损失函数对象.
     criterion = nn.CrossEntropyLoss()  # 多分类交叉熵损失函数 = softmax()激活函数 + 损失计算.
     # 4. 创建优化器对象.
@@ -125,6 +126,8 @@ def train(train_dataset):
         total_loss, total_samples, total_correct, start = 0.0, 0, 0, time.time()
         # 5.2.2 遍历数据加载器, 获取到 每批次的 数据.
         for x, y in dataloader:
+            x = x.to(DEVICE)
+            y = y.to(DEVICE)
             # 5.2.3 切换训练模式.
             model.train()
             # 5.2.4 模型预测.
@@ -165,13 +168,15 @@ def evaluate(test_dataset):
     # 1. 创建测试集 数据加载器.
     dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
     # 2. 创建模型对象.
-    model = ImageModel()
+    model = ImageModel().to(DEVICE)
     # 3. 加载模型参数.
-    model.load_state_dict(torch.load('./model/image_model.pth'))    # pickle文件
+    model.load_state_dict(torch.load('./model/image_model.pth', map_location=DEVICE))    # pickle文件
     # 4. 定义变量统计 预测正确的样本个数, 总样本个数.
     total_correct, total_samples = 0, 0
     # 5. 遍历数据加载器, 获取到 每批次 的数据.
     for x, y in dataloader:
+        x = x.to(DEVICE)
+        y = y.to(DEVICE)
         # 5.1 切换模型模式.
         model.eval()
         # 5.2 模型预测.
@@ -204,12 +209,12 @@ if __name__ == '__main__':
     # plt.show()
 
     # 2. 搭建神经网络.
-    # model = ImageModel()
+    model = ImageModel().to(DEVICE)
     # 查看模型参数, 参1: 模型, 参2: 输入维度(CHW, 通道, 高, 宽), 参3: 批次大小
-    # summary(model, (3, 32, 32), batch_size=1)
+    summary(model, (3, 32, 32), batch_size=1)
 
     # 3. 模型训练.
-    # train(train_dataset)
+    train(train_dataset)
 
     # 4. 模型测试.
     evaluate(test_dataset)
